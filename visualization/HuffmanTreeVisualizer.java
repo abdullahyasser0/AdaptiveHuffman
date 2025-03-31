@@ -19,8 +19,8 @@ public class HuffmanTreeVisualizer extends Application {
     @Override
     public void start(Stage primaryStage) {
         pane = new Pane();
-        tree = new HuffmanTree("A");
-
+        tree = new HuffmanTree();
+        insertSymbol("A");
         new Thread(() -> {
             try {
                 Thread.sleep(1000); insertSymbol("B");
