@@ -40,7 +40,7 @@ public class Node {
         this.right = right;
     }
 
-    public int NNumber() {
+    public int getNumber() {
         return this.NodeNumber;
     }
 
