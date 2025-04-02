@@ -40,13 +40,20 @@ public class Decoder {
         this.tree = new HuffmanTree();
     }
 
-    public String Decode(String EncodedCode, HashMap<String, String> map){
-        StringBuilder plaintext = new StringBuilder();
-        Map.Entry<String, String> firstEntry = map.entrySet().iterator().next();
-        int SCL = firstEntry.getKey().length(); //SCL >> short code lenght
+    public String binaryToSymbol(String BinaryAssi){
+        int asciiNumber = Integer.parseInt(BinaryAssi, 2); // get the asci
 
-        String firstSymbolCode = EncodedCode.substring(0, SCL);
-        String firstSymbol = map.get(firstSymbolCode);
+        return Character.toString((char) asciiNumber);
+    }
+
+    public String Decode(String EncodedCode){
+        StringBuilder plaintext = new StringBuilder();
+
+        int SCL = 8;
+
+        String firstSymbolCode = EncodedCode.substring(0, SCL); // extract first binary of asci
+        String firstSymbol = binaryToSymbol(firstSymbolCode);
+
         plaintext.append(firstSymbol);
         tree.insertSymbol(firstSymbol);
         Node travers = tree.getRoot();
@@ -62,9 +69,9 @@ public class Decoder {
                         travers = tree.getRoot();
                         path= new StringBuilder();
                     } else {
-                        String substring = EncodedCode.substring(i+1, SCL+i+1);
+                        String substring = EncodedCode.substring(i+1, SCL+i+1); //get binary of ASCI
                         i+=SCL;
-                        String substringvalue = map.get(substring);
+                        String substringvalue = binaryToSymbol(substring);
                         tree.insertSymbol(substringvalue);
                         plaintext.append(substringvalue);
                         travers = tree.getRoot();
@@ -84,7 +91,7 @@ public class Decoder {
                     } else {
                         String substring = EncodedCode.substring(i+1, SCL+i+1);
                         i+=SCL;
-                        String substringvalue = map.get(substring);
+                        String substringvalue = binaryToSymbol(substring);
                         tree.insertSymbol(substringvalue);
                         plaintext.append(substringvalue);
                         travers = tree.getRoot();
@@ -98,16 +105,9 @@ public class Decoder {
     }
 
     public static void main(String[] args) {
-        HashMap<String, String> huffmanMap = new HashMap<>();
-        // key >> value
-        // why short code is the key ? im extracting the shortCode and i want its value, so short code is the key
-        huffmanMap.put("00", "A");
-        huffmanMap.put("01", "B");
-
-        huffmanMap.put("10", "C");
 
         Decoder decoder = new Decoder();
-        String encodedOutput = decoder.Decode("000010010101000101110", huffmanMap);
+        String encodedOutput = decoder.Decode("010000010010000100001000011101000101110");
         System.out.println("Decmpresesd Text: " + encodedOutput);
     }
 

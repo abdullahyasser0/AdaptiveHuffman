@@ -21,19 +21,11 @@ public class AdaptiveHiffmanTest {
 
     @Test
     public void testEncode() {
-        HashMap<String, String> huffmanMap = new HashMap<>();
-        huffmanMap.put("A", "00");
-        huffmanMap.put("B", "01");
-        huffmanMap.put("C", "10");
-        assertEquals("000010010101000101110", encoder.encode("ABCCCAAAA", huffmanMap));
+        assertEquals("010000010010000100001000011101000101110", encoder.encode("ABCCCAAAA"));
     }
 
     @Test
     public void testDecode() {
-        HashMap<String, String> huffmanMap = new HashMap<>();
-        huffmanMap.put("00", "A");
-        huffmanMap.put("01", "B");
-        huffmanMap.put("10", "C");
-        assertEquals("ABCCCAAAA", decoder.Decode("000010010101000101110", huffmanMap));
+        assertEquals("ABCCCAAAA", decoder.Decode("010000010010000100001000011101000101110"));
     }
 }

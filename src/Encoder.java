@@ -35,26 +35,27 @@ public class Encoder {
     }
 
     // Encoding Function
-    public String encode(String plainText, HashMap<String, String> map) {
-        StringBuilder encodedText = new StringBuilder();
+    public String encode(String plainText) {
+        StringBuilder encodedText = new StringBuilder();  // this should contain binary representation
 
         for (char symbol : plainText.toCharArray()) {
             String symbolStr = String.valueOf(symbol);
-
+            int asciiValue = (int) symbol;
+            String binary = String.format("%8s", Integer.toBinaryString(asciiValue)).replace(' ', '0'); //extract acsi binary code
             if (tree.isEmpty()) { // First symbol case
-                encodedText.append(map.getOrDefault(symbolStr, ""));
+                encodedText.append(binary);
                 tree.insertSymbol(symbolStr);
-            } else {
+            } else { //if the tree already contain
                 String code = tree.getSymbolCode(symbolStr);
                 if (code != null) {
                     encodedText.append(code);
                     tree.insertSymbol(symbolStr);
-                } else { // If symbol is new, encode as "NYT" + its Huffman code
+                } else { // If symbol is new, encode as "NYT" + its ASCI code
                     String nytCode = tree.getSymbolCode("NYT");
                     if (nytCode != null) {
-                        encodedText.append(nytCode);
+                        encodedText.append(nytCode); // append the nyt
                     }
-                    encodedText.append(map.getOrDefault(symbolStr, ""));
+                    encodedText.append(binary); //append its acsi binary vcode
                     tree.insertSymbol(symbolStr);
                 }
             }
@@ -65,15 +66,9 @@ public class Encoder {
 
     // Main method for testing
     public static void main(String[] args) {
-        HashMap<String, String> huffmanMap = new HashMap<>();
-        // here why the symbol is key and the code is value? im using the symbol to get its short code
-        huffmanMap.put("A", "00");
-        huffmanMap.put("B", "01");
-
-        huffmanMap.put("C", "10");
 
         Encoder encoder = new Encoder();
-        String encodedOutput = encoder.encode("ABCCCAAAA", huffmanMap);
+        String encodedOutput = encoder.encode("ABCCCAAAA");
         System.out.println("Encoded Text: " + encodedOutput);
     }
 }
