@@ -66,6 +66,7 @@ public class Encoder {
     // Main method for testing
     public static void main(String[] args) {
         HashMap<String, String> huffmanMap = new HashMap<>();
+        // here why the symbol is key and the code is value? im using the symbol to get its short code
         huffmanMap.put("A", "00");
         huffmanMap.put("B", "01");
 
