@@ -11,6 +11,8 @@ import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.Line;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
+import javafx.animation.TranslateTransition;
+import javafx.util.Duration;
 import src.HuffmanTree;
 import src.Node;
 
@@ -19,16 +21,15 @@ public class HuffmanTreeVisualizer extends Application {
     private Pane pane;
     private volatile boolean isSwapInProgress = false;
     private volatile boolean isPaused = false;
-    private Node preSwapRoot;  // Store the root before the swap
+    private Node preSwapRoot;
 
     @Override
     public void start(Stage primaryStage) {
         pane = new Pane();
         tree = new HuffmanTree();
-        tree.setVisualizer(this);  // Set visualizer to the tree
-        tree.setSwapListener(this::highlightSwap);
+        tree.setVisualizer(this);
+        tree.setSwapListener(this::highlightAndAnimateSwap);
 
-        // Create a pause button
         Button pauseButton = new Button("Pause");
         pauseButton.setLayoutX(10);
         pauseButton.setLayoutY(10);
@@ -37,11 +38,9 @@ public class HuffmanTreeVisualizer extends Application {
             pauseButton.setText(isPaused ? "Resume" : "Pause");
         });
 
-        // Add the button to a VBox to manage layout
         VBox root = new VBox(10);
         root.getChildren().addAll(pauseButton, pane);
 
-        // Simulate insertion of symbols
         new Thread(() -> {
             try {
                 insertSymbol("A");
@@ -72,43 +71,24 @@ public class HuffmanTreeVisualizer extends Application {
         primaryStage.show();
     }
 
-    // Trigger a redraw of the tree, useful for external calls (e.g., from HuffmanTree class)
     public void triggerRedraw() {
         new Thread(() -> {
             try {
-                // Delay before starting the redraw (optional)
-                Thread.sleep(1000);  // Adjust the delay time as needed
-
-                // Redraw the tree after the initial delay
+                Thread.sleep(1000);
                 Platform.runLater(() -> {
-                    // Ensure pane is cleared and re-drawn
-                    if (pane != null) {
-                        pane.getChildren().clear();  // Clear the existing UI elements
-                        if (tree.getRoot() != null) {
-                            System.out.println("Redrawing tree...");
-                            drawTree(pane, tree.getRoot(), 400, 50, 200, null, null);  // Redraw the tree with the current root
-                        } else {
-                            System.out.println("Root node is null. Cannot redraw tree.");
-                        }
-                    } else {
-                        System.out.println("Pane is null. Cannot clear and redraw tree.");
+                    pane.getChildren().clear();
+                    if (tree.getRoot() != null) {
+                        drawTree(tree.getRoot(), 400, 50, 200);
                     }
                 });
-
-                // Sleep for 1 second after drawing
-                Thread.sleep(1000);  // Adjust the delay time as needed
-                System.out.println("Pause after redraw.");
-
+                Thread.sleep(1000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         }).start();
     }
 
-
-
     private void insertSymbol(String symbol) {
-        // Wait for any ongoing swap visualization to complete
         while (isSwapInProgress) {
             try {
                 Thread.sleep(100);
@@ -117,7 +97,6 @@ public class HuffmanTreeVisualizer extends Application {
             }
         }
 
-        // Check if paused
         while (isPaused) {
             try {
                 Thread.sleep(100);
@@ -126,37 +105,20 @@ public class HuffmanTreeVisualizer extends Application {
             }
         }
 
-        // Store the pre-swap state of the tree
         preSwapRoot = deepCopyNode(tree.getRoot());
-
-        // Perform the insertion (which may trigger swaps)
         tree.insertSymbol(symbol);
-
-        // Redraw the tree after the swap is complete
         Platform.runLater(() -> {
             pane.getChildren().clear();
-            drawTree(pane, tree.getRoot(), 400, 50, 200, null, null);
+            drawTree(tree.getRoot(), 400, 50, 200);
         });
     }
 
-    // Method to draw the tree with the option to highlight two nodes
-    private void drawTree(Pane pane, Node node, double x, double y, double hSpacing, Node highlight1, Node highlight2) {
+    public void drawTree(Node node, double x, double y, double hSpacing) {
         if (node != null) {
             Rectangle rectangle = new Rectangle(x - 30, y - 20, 85, 40);
-
-            // Check if node should be highlighted
-            if (highlight1!=null) {
-                if (node.getNumber() == highlight1.getNumber() || node.getNumber() == highlight2.getNumber()) {
-                    rectangle.setFill(Color.RED);
-                    rectangle.setStroke(Color.DARKRED);
-                } else {
-                    rectangle.setFill(Color.LIGHTBLUE);
-                    rectangle.setStroke(Color.BLACK);
-                }
-            }else {
-                rectangle.setFill(Color.LIGHTBLUE);
-                rectangle.setStroke(Color.BLACK);
-            }
+            rectangle.setFill(Color.LIGHTBLUE);
+            rectangle.setStroke(Color.BLACK);
+            rectangle.setUserData(node); // Store node reference
 
             String label = "N:" + node.getNumber() + " F:" + node.getFreq();
             if (node.getSymbol() != null) {
@@ -164,6 +126,8 @@ public class HuffmanTreeVisualizer extends Application {
             }
 
             Text text = new Text(x - 25, y, label);
+            text.setUserData(node); // Store node reference
+
             pane.getChildren().addAll(rectangle, text);
 
             if (node.getLeft() != null) {
@@ -171,7 +135,7 @@ public class HuffmanTreeVisualizer extends Application {
                 double childY = y + 60;
                 Line line = new Line(x, y + 20, childX, childY - 20);
                 pane.getChildren().add(line);
-                drawTree(pane, node.getLeft(), childX, childY, hSpacing / 2, highlight1, highlight2);
+                drawTree(node.getLeft(), childX, childY, hSpacing / 2);
             }
 
             if (node.getRight() != null) {
@@ -179,60 +143,82 @@ public class HuffmanTreeVisualizer extends Application {
                 double childY = y + 60;
                 Line line = new Line(x, y + 20, childX, childY - 20);
                 pane.getChildren().add(line);
-                drawTree(pane, node.getRight(), childX, childY, hSpacing / 2, highlight1, highlight2);
+                drawTree(node.getRight(), childX, childY, hSpacing / 2);
             }
         }
     }
 
-    // Highlight the nodes before swapping
-    private void highlightSwap(Node node1, Node node2) {
+    private void highlightAndAnimateSwap(Node node1, Node node2) {
         isSwapInProgress = true;
         new Thread(() -> {
             try {
-                // Step 1: Clear the pane first
                 Platform.runLater(() -> {
                     pane.getChildren().clear();
-                });
+                    drawTree(preSwapRoot, 400, 50, 200);
 
-                // Step 2: Wait for 1 second
-                Thread.sleep(0);
+                    // Find the rectangles and texts to animate
+                    Rectangle rect1 = null, rect2 = null;
+                    Text text1 = null, text2 = null;
 
-                // Step 3: Highlight the nodes in their pre-swap positions using the pre-swap root
-                Platform.runLater(() -> {
-                    System.out.println("Highlighting nodes before swap: " + node1.getNumber() + " <-> " + node2.getNumber());
-                    drawTree(pane, preSwapRoot, 400, 50, 200, node1, node2);
-                });
-
-                // Step 4: Keep the highlighted nodes visible for 3 seconds
-                long startTime = System.currentTimeMillis();
-                long pauseTime = 3000;
-                while (System.currentTimeMillis() - startTime < pauseTime) {
-                    if (isPaused) {
-                        Thread.sleep(100);
-                        startTime = System.currentTimeMillis() - (pauseTime - 3000);
-                    } else {
-                        Thread.sleep(100);
+                    for (var child : pane.getChildren()) {
+                        if (child instanceof Rectangle) {
+                            Node n = (Node) child.getUserData();
+                            if (n.getNumber() == node1.getNumber()) rect1 = (Rectangle) child;
+                            if (n.getNumber() == node2.getNumber()) rect2 = (Rectangle) child;
+                        }
+                        if (child instanceof Text) {
+                            Node n = (Node) child.getUserData();
+                            if (n.getNumber() == node1.getNumber()) text1 = (Text) child;
+                            if (n.getNumber() == node2.getNumber()) text2 = (Text) child;
+                        }
                     }
-                }
 
-                // Step 5: Redraw the tree to reflect the swap (using the current root)
-                Platform.runLater(() -> {
-                    System.out.println("Redrawing tree after swap...");
-                    pane.getChildren().clear();
-                    drawTree(pane, tree.getRoot(), 400, 50, 200, null, null);
+                    if (rect1 != null && rect2 != null && text1 != null && text2 != null) {
+                        // Highlight nodes
+                        rect1.setFill(Color.RED);
+                        rect2.setFill(Color.RED);
+                        rect1.setStroke(Color.DARKRED);
+                        rect2.setStroke(Color.DARKRED);
+
+                        // Calculate translation distances
+                        double dx1 = rect2.getX() - rect1.getX();
+                        double dy1 = rect2.getY() - rect1.getY();
+                        double dx2 = rect1.getX() - rect2.getX();
+                        double dy2 = rect1.getY() - rect2.getY();
+
+                        // Create animations
+                        TranslateTransition tt1 = new TranslateTransition(Duration.millis(1000), rect1);
+                        tt1.setByX(dx1);
+                        tt1.setByY(dy1);
+
+                        TranslateTransition tt2 = new TranslateTransition(Duration.millis(1000), rect2);
+                        tt2.setByX(dx2);
+                        tt2.setByY(dy2);
+
+                        TranslateTransition tt3 = new TranslateTransition(Duration.millis(1000), text1);
+                        tt3.setByX(dx1);
+                        tt3.setByY(dy1);
+
+                        TranslateTransition tt4 = new TranslateTransition(Duration.millis(1000), text2);
+                        tt4.setByX(dx2);
+                        tt4.setByY(dy2);
+
+                        // Play animations simultaneously
+                        tt1.play();
+                        tt2.play();
+                        tt3.play();
+                        tt4.play();
+
+                        tt1.setOnFinished(e -> {
+                            Platform.runLater(() -> {
+                                pane.getChildren().clear();
+                                drawTree(tree.getRoot(), 400, 50, 200);
+                            });
+                        });
+                    }
                 });
 
-                // Step 6: Keep the updated tree visible for 4 seconds
-                startTime = System.currentTimeMillis();
-                pauseTime = 4000;
-                while (System.currentTimeMillis() - startTime < pauseTime) {
-                    if (isPaused) {
-                        Thread.sleep(100);
-                        startTime = System.currentTimeMillis() - (pauseTime - 4000);
-                    } else {
-                        Thread.sleep(100);
-                    }
-                }
+                Thread.sleep(2000); // Wait for animation to complete plus extra time
 
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -242,24 +228,15 @@ public class HuffmanTreeVisualizer extends Application {
         }).start();
     }
 
-
-    // Deep copy method for Node to preserve the pre-swap state
     private Node deepCopyNode(Node node) {
-        if (node == null) {
-            return null;
-        }
+        if (node == null) return null;
 
         Node copy = new Node(node.getFreq(), node.getNumber(), node.getSymbol());
         copy.setLeft(deepCopyNode(node.getLeft()));
         copy.setRight(deepCopyNode(node.getRight()));
 
-        // Set parent references for the copied nodes
-        if (copy.getLeft() != null) {
-            copy.getLeft().setParent(copy);
-        }
-        if (copy.getRight() != null) {
-            copy.getRight().setParent(copy);
-        }
+        if (copy.getLeft() != null) copy.getLeft().setParent(copy);
+        if (copy.getRight() != null) copy.getRight().setParent(copy);
 
         return copy;
     }
