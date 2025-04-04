@@ -15,21 +15,18 @@ import javafx.animation.TranslateTransition;
 import javafx.util.Duration;
 import src.HuffmanTree;
 import src.Node;
+import src.HuffmanTree.SwapListener;
 
 public class HuffmanTreeVisualizer extends Application {
-    private HuffmanTree tree;
-    private Pane pane;
-    private volatile boolean isSwapInProgress = false;
-    private volatile boolean isPaused = false;
-    private Node preSwapRoot;
+    private static HuffmanTree tree;
+    private static Pane pane;
+    private static volatile boolean isSwapInProgress = false;
+    private static volatile boolean isPaused = false;
+    private static Node preSwapRoot;
 
     @Override
     public void start(Stage primaryStage) {
         pane = new Pane();
-        tree = new HuffmanTree();
-        tree.setVisualizer(this);
-        tree.setSwapListener(this::highlightAndAnimateSwap);
-
         Button pauseButton = new Button("Pause");
         pauseButton.setLayoutX(10);
         pauseButton.setLayoutY(10);
@@ -41,59 +38,28 @@ public class HuffmanTreeVisualizer extends Application {
         VBox root = new VBox(10);
         root.getChildren().addAll(pauseButton, pane);
 
-        new Thread(() -> {
-            try {
-                insertSymbol("A");
-                Thread.sleep(2000);
-                insertSymbol("B");
-                Thread.sleep(2000);
-                insertSymbol("C");
-                Thread.sleep(2000);
-                insertSymbol("C");
-                Thread.sleep(2000);
-                insertSymbol("C");
-                Thread.sleep(2000);
-                insertSymbol("A");
-                Thread.sleep(2000);
-                insertSymbol("A");
-                Thread.sleep(2000);
-                insertSymbol("A");
-                Thread.sleep(2000);
-                insertSymbol("A");
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }).start();
-
         Scene scene = new Scene(root, 800, 600);
         primaryStage.setTitle("Huffman Tree Visualization");
         primaryStage.setScene(scene);
         primaryStage.show();
     }
 
-    public void triggerRedraw() {
-        new Thread(() -> {
-            try {
-                Thread.sleep(1000);
-                Platform.runLater(() -> {
-                    pane.getChildren().clear();
-                    if (tree.getRoot() != null) {
-                        drawTree(tree.getRoot(), 400, 50, 200);
-                    }
-                });
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+    public static void triggerRedraw() {
+        Platform.runLater(() -> {
+            pane.getChildren().clear();
+            if (tree != null && tree.getRoot() != null) {
+                drawTree(tree.getRoot(), 400, 50, 200);
             }
-        }).start();
+        });
     }
 
-    private void insertSymbol(String symbol) {
+    public static void insertSymbol(String symbol) {
         while (isSwapInProgress) {
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                Thread.currentThread().interrupt();
+                return;
             }
         }
 
@@ -101,24 +67,22 @@ public class HuffmanTreeVisualizer extends Application {
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                Thread.currentThread().interrupt();
+                return;
             }
         }
 
         preSwapRoot = deepCopyNode(tree.getRoot());
         tree.insertSymbol(symbol);
-        Platform.runLater(() -> {
-            pane.getChildren().clear();
-            drawTree(tree.getRoot(), 400, 50, 200);
-        });
+        triggerRedraw();
     }
 
-    public void drawTree(Node node, double x, double y, double hSpacing) {
+    public static void drawTree(Node node, double x, double y, double hSpacing) {
         if (node != null) {
             Rectangle rectangle = new Rectangle(x - 30, y - 20, 85, 40);
             rectangle.setFill(Color.LIGHTBLUE);
             rectangle.setStroke(Color.BLACK);
-            rectangle.setUserData(node); // Store node reference
+            rectangle.setUserData(node);
 
             String label = "N:" + node.getNumber() + " F:" + node.getFreq();
             if (node.getSymbol() != null) {
@@ -126,7 +90,7 @@ public class HuffmanTreeVisualizer extends Application {
             }
 
             Text text = new Text(x - 25, y, label);
-            text.setUserData(node); // Store node reference
+            text.setUserData(node);
 
             pane.getChildren().addAll(rectangle, text);
 
@@ -148,15 +112,15 @@ public class HuffmanTreeVisualizer extends Application {
         }
     }
 
-    private void highlightAndAnimateSwap(Node node1, Node node2) {
+    public static void highlightAndAnimateSwap(Node node1, Node node2, String reason) {
         isSwapInProgress = true;
         new Thread(() -> {
             try {
+                // Step 1: Show pre-swap state with red highlights and reason for 5 seconds
                 Platform.runLater(() -> {
                     pane.getChildren().clear();
                     drawTree(preSwapRoot, 400, 50, 200);
 
-                    // Find the rectangles and texts to animate
                     Rectangle rect1 = null, rect2 = null;
                     Text text1 = null, text2 = null;
 
@@ -173,20 +137,58 @@ public class HuffmanTreeVisualizer extends Application {
                         }
                     }
 
-                    if (rect1 != null && rect2 != null && text1 != null && text2 != null) {
-                        // Highlight nodes
+                    if (rect1 != null && rect2 != null) {
                         rect1.setFill(Color.RED);
                         rect2.setFill(Color.RED);
                         rect1.setStroke(Color.DARKRED);
                         rect2.setStroke(Color.DARKRED);
+                    }
 
-                        // Calculate translation distances
+                    // Add reason text
+                    Text reasonText = new Text(10, 550, "Swap Reason: " + reason); // Use the reason parameter
+                    reasonText.setFill(Color.BLACK);
+                    reasonText.setStyle("-fx-font-size: 16px;");
+                    pane.getChildren().add(reasonText);
+                });
+
+                Thread.sleep(5000); // Hold pre-swap state with reason for 5 seconds
+
+                // Step 2: Remove reason text and prepare for swap animation
+                Platform.runLater(() -> {
+                    // Remove the reason text by redrawing without it
+                    pane.getChildren().clear();
+                    drawTree(preSwapRoot, 400, 50, 200);
+
+                    Rectangle rect1 = null, rect2 = null;
+                    Text text1 = null, text2 = null;
+
+                    for (var child : pane.getChildren()) {
+                        if (child instanceof Rectangle) {
+                            Node n = (Node) child.getUserData();
+                            if (n.getNumber() == node1.getNumber()) rect1 = (Rectangle) child;
+                            if (n.getNumber() == node2.getNumber()) rect2 = (Rectangle) child;
+                        }
+                        if (child instanceof Text) {
+                            Node n = (Node) child.getUserData();
+                            if (n.getNumber() == node1.getNumber()) text1 = (Text) child;
+                            if (n.getNumber() == node2.getNumber()) text2 = (Text) child;
+                        }
+                    }
+
+                    if (rect1 != null && rect2 != null) {
+                        rect1.setFill(Color.RED);
+                        rect2.setFill(Color.RED);
+                        rect1.setStroke(Color.DARKRED);
+                        rect2.setStroke(Color.DARKRED);
+                    }
+
+                    // Perform the swap animation
+                    if (rect1 != null && rect2 != null && text1 != null && text2 != null) {
                         double dx1 = rect2.getX() - rect1.getX();
                         double dy1 = rect2.getY() - rect1.getY();
                         double dx2 = rect1.getX() - rect2.getX();
                         double dy2 = rect1.getY() - rect2.getY();
 
-                        // Create animations
                         TranslateTransition tt1 = new TranslateTransition(Duration.millis(1000), rect1);
                         tt1.setByX(dx1);
                         tt1.setByY(dy1);
@@ -203,32 +205,54 @@ public class HuffmanTreeVisualizer extends Application {
                         tt4.setByX(dx2);
                         tt4.setByY(dy2);
 
-                        // Play animations simultaneously
                         tt1.play();
                         tt2.play();
                         tt3.play();
                         tt4.play();
-
-                        tt1.setOnFinished(e -> {
-                            Platform.runLater(() -> {
-                                pane.getChildren().clear();
-                                drawTree(tree.getRoot(), 400, 50, 200);
-                            });
-                        });
                     }
                 });
 
-                Thread.sleep(2000); // Wait for animation to complete plus extra time
+                Thread.sleep(3000); // Wait for animation to complete
+
+                // Step 3: Show post-swap state with red highlights for 5 seconds (no reason text)
+                Platform.runLater(() -> {
+                    pane.getChildren().clear();
+                    drawTree(tree.getRoot(), 400, 50, 200);
+
+                    Rectangle rect1 = null, rect2 = null;
+                    for (var child : pane.getChildren()) {
+                        if (child instanceof Rectangle) {
+                            Node n = (Node) child.getUserData();
+                            if (n.getNumber() == node1.getNumber()) rect1 = (Rectangle) child;
+                            if (n.getNumber() == node2.getNumber()) rect2 = (Rectangle) child;
+                        }
+                    }
+
+                    if (rect1 != null && rect2 != null) {
+                        rect1.setFill(Color.RED);
+                        rect2.setFill(Color.RED);
+                        rect1.setStroke(Color.DARKRED);
+                        rect2.setStroke(Color.DARKRED);
+                    }
+                });
+
+                Thread.sleep(5000); // Hold post-swap state for 5 seconds
+
+                // Step 4: Return to blue and final redraw
+                Platform.runLater(() -> {
+                    pane.getChildren().clear();
+                    drawTree(tree.getRoot(), 400, 50, 200); // This redraws without the reason text
+                });
 
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                Thread.currentThread().interrupt();
             } finally {
                 isSwapInProgress = false;
             }
         }).start();
     }
 
-    private Node deepCopyNode(Node node) {
+    private static Node deepCopyNode(Node node) {
         if (node == null) return null;
 
         Node copy = new Node(node.getFreq(), node.getNumber(), node.getSymbol());
@@ -242,6 +266,22 @@ public class HuffmanTreeVisualizer extends Application {
     }
 
     public static void main(String[] args) {
+        tree = new HuffmanTree();
+        tree.setVisualizer(new HuffmanTreeVisualizer());
+        tree.setSwapListener(HuffmanTreeVisualizer::highlightAndAnimateSwap);
+
+        new Thread(() -> {
+            String str = "ABCCCAAAA";
+            for (char symbol : str.toCharArray()) {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                insertSymbol(String.valueOf(symbol));
+            }
+        }).start();
+
         launch(args);
     }
 }

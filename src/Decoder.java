@@ -22,6 +22,9 @@ how it work ?
 
     and so on
 
+class Decoder {
+    Decoder() {
+    }
 
 
 
